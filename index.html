@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chromecast Player</title>
+  <title>Chromecast Auto-Play</title>
   
   <!-- Google Cast Sender SDK -->
   <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
@@ -41,6 +41,31 @@
     .header p {
       color: #aaa;
       font-size: 0.9em;
+    }
+    
+    .status-bar {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      text-align: center;
+      font-size: 1em;
+      transition: all 0.3s;
+    }
+    
+    .status-bar.connected {
+      background: rgba(77, 255, 140, 0.2);
+      border-left: 4px solid #4dff8c;
+    }
+    
+    .status-bar.disconnected {
+      background: rgba(255, 77, 77, 0.2);
+      border-left: 4px solid #ff4d4d;
+    }
+    
+    .status-bar.searching {
+      background: rgba(255, 200, 0, 0.2);
+      border-left: 4px solid #ffc800;
     }
     
     .controls {
@@ -107,57 +132,51 @@
       box-shadow: none;
     }
     
-    .video-container {
-      position: relative;
-      width: 100%;
-      background: #000;
+    .btn-success {
+      background: linear-gradient(135deg, #4dff8c, #00cc66);
+    }
+    
+    .video-info {
+      background: rgba(0, 0, 0, 0.3);
       border-radius: 8px;
-      overflow: hidden;
-      min-height: 200px;
+      padding: 15px;
+      margin-top: 15px;
+      font-size: 0.9em;
+    }
+    
+    .video-info strong {
+      color: #ff4d4d;
+    }
+    
+    .cast-button-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: none;
+    }
+    
+    #castButton {
+      width: 48px;
+      height: 48px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 2px solid #333;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 2px solid #ff4d4d;
     }
     
-    #videoPlayer {
-      width: 100%;
-      display: none;
+    #castButton:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.1);
     }
     
-    .placeholder {
-      color: #666;
-      font-size: 1.2em;
-      text-align: center;
-      padding: 40px 20px;
-    }
-    
-    .status {
-      margin-top: 15px;
-      padding: 12px;
-      background: rgba(0, 0, 0, 0.3);
-      border-radius: 6px;
-      font-size: 0.9em;
-      display: none;
-    }
-    
-    .status.error {
-      background: rgba(255, 77, 77, 0.2);
-      border-left: 4px solid #ff4d4d;
-      display: block;
-    }
-    
-    .status.success {
-      background: rgba(77, 255, 140, 0.2);
-      border-left: 4px solid #4dff8c;
-      display: block;
-    }
-    
-    .cast-available {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 100;
+    #castButton.connected {
+      background: rgba(77, 255, 140, 0.3);
+      border-color: #4dff8c;
     }
     
     @media (max-width: 600px) {
@@ -172,9 +191,23 @@
   </style>
 </head>
 <body>
+  <div class="cast-button-container" id="castButtonContainer">
+    <div id="castButton">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+        <path d="M21,3H3C1.9,3,1,3.9,1,5v14c0,1.1,0.9,2,2,2h18c1.1,0,2-0.9,2-2V5C23,3.9,22.1,3,21,3z M21,19H3V5h18V19z"/>
+        <path d="M12,11c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5S14.76,11,12,11z M12,19c-1.65,0-3-1.35-3-3s1.35-3,3-3s3,1.35,3,3 S13.65,19,12,19z"/>
+        <circle cx="12" cy="7" r="2"/>
+      </svg>
+    </div>
+  </div>
+  
   <div class="header">
-    <h1>📺 Chromecast Player</h1>
-    <p>Clique no ícone <strong style="color:#ff4d4d">⏺</strong> para enviar ao Chromecast</p>
+    <h1>📺 Chromecast Auto-Play</h1>
+    <p>O vídeo será enviado automaticamente para o Chromecast</p>
+  </div>
+  
+  <div class="status-bar disconnected" id="statusBar">
+    🔌 Não conectado ao Chromecast
   </div>
   
   <div class="controls">
@@ -185,178 +218,265 @@
     </div>
     
     <div class="input-group">
-      <label for="contentType">📝 Content Type (opcional)</label>
+      <label for="videoTitle">🎬 Título do Vídeo (opcional)</label>
+      <input type="text" id="videoTitle" placeholder="Meu Vídeo" value="Big Buck Bunny">
+    </div>
+    
+    <div class="input-group">
+      <label for="contentType">📝 Content Type</label>
       <input type="text" id="contentType" placeholder="video/mp4" value="video/mp4">
     </div>
     
-    <button class="btn" onclick="loadVideo()">▶️ Carregar e Reproduzir</button>
+    <button class="btn" onclick="loadAndCast()">▶️ Carregar e Enviar para Chromecast</button>
   </div>
   
-  <div class="video-container">
-    <div id="castButton" class="cast-available"></div>
-    <video id="videoPlayer" controls></video>
-    <div class="placeholder" id="placeholder">
-      🔲 Insira uma URL de vídeo acima<br>
-      <small style="color:#888;display:block;margin-top:10px">
-        Ex: https://example.com/video.mp4
-      </small>
-    </div>
+  <div class="video-info" id="videoInfo" style="display:none;">
+    <strong>Informações:</strong><br>
+    <span id="infoUrl"></span><br>
+    <span id="infoTitle"></span><br>
+    <span id="infoType"></span>
   </div>
-  
-  <div class="status" id="status"></div>
 
   <script>
-    let currentSession = null;
-    let mediaSession = null;
     let castContext = null;
+    let currentSession = null;
+    let currentMediaSession = null;
+    let autoCastEnabled = true; // Enviar automaticamente quando possível
     
     // Inicializar Cast Framework quando disponível
     window['__onGCastApiAvailable'] = function(loaded, errorInfo) {
       if (loaded) {
-        console.log('Google Cast SDK carregado');
+        console.log('✅ Google Cast SDK carregado');
         initializeCastApi();
       } else {
-        console.error('Erro ao carregar Cast SDK:', errorInfo);
-        showStatus('Google Cast não disponível neste dispositivo', 'error');
+        console.error('❌ Erro ao carregar Cast SDK:', errorInfo);
+        updateStatus('⚠️ Google Cast não disponível', 'disconnected');
       }
     };
     
     function initializeCastApi() {
+      // Inicializar Cast Context
       castContext = cast.framework.CastContext.getInstance();
       
       const options = new cast.framework.CastContextOptions();
-      options.receiverApplicationId = cast.framework.system.ReceiverApplication.APP_ID;
+      options.receiverApplicationId = chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID;
       options.autoJoinPolicy = chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED;
       
       castContext.setOptions(options);
       
+      // Listener para mudanças de sessão
       castContext.addEventListener(
         cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
         (event) => {
-          console.log('Session state changed:', event.sessionState);
+          console.log('Session state:', event.sessionState);
+          
           if (event.sessionState === 'SESSION_STARTED') {
-            showStatus('✅ Conectado ao Chromecast!', 'success');
+            currentSession = castContext.getCurrentSession();
+            updateStatus('✅ Conectado ao Chromecast!', 'connected');
+            document.getElementById('castButton').classList.add('connected');
+            
+            // Se tiver vídeo carregado, enviar automaticamente
+            if (autoCastEnabled && window.pendingVideo) {
+              sendToChromecast(window.pendingVideo);
+            }
           } else if (event.sessionState === 'SESSION_ENDED') {
-            showStatus('🔌 Conexão encerrada', 'error');
+            currentSession = null;
+            currentMediaSession = null;
+            updateStatus('🔌 Conexão encerrada', 'disconnected');
+            document.getElementById('castButton').classList.remove('connected');
+          } else if (event.sessionState === 'SESSION_RESUMED') {
+            currentSession = castContext.getCurrentSession();
+            updateStatus('✅ Sessão retomada', 'connected');
+            document.getElementById('castButton').classList.add('connected');
           }
         }
       );
       
+      // Listener para mudanças de estado do Cast
       castContext.addEventListener(
         cast.framework.CastContextEventType.CAST_STATE_CHANGED,
         (event) => {
           console.log('Cast state:', event.castState);
-          const castButton = document.querySelector('.cast-available');
+          
           if (event.castState === 'NOT_CONNECTED') {
-            castButton.style.display = 'block';
+            updateStatus('🔍 Procurando dispositivos...', 'searching');
+          } else if (event.castState === 'CONNECTED') {
+            updateStatus('✅ Chromecast detectado!', 'connected');
+          } else if (event.castState === 'NO_DEVICES_AVAILABLE') {
+            updateStatus('❌ Nenhum Chromecast encontrado', 'disconnected');
           }
         }
       );
+      
+      // Listener para eventos de mídia
+      castContext.addEventListener(
+        cast.framework.CastContextEventType.MEDIA_SESSION_STATE_CHANGED,
+        (event) => {
+          console.log('Media session state:', event.mediaSessionState);
+          
+          if (event.mediaSessionState === 'ACTIVE') {
+            currentMediaSession = currentSession ? currentSession.getMediaSession() : null;
+            updateStatus('▶️ Transmitindo para Chromecast...', 'connected');
+          } else if (event.mediaSessionState === 'ENDED') {
+            currentMediaSession = null;
+            updateStatus('⏹️ Transmissão encerrada', 'connected');
+          }
+        }
+      );
+      
+      updateStatus('⏳ Inicializando...', 'searching');
+      
+      // Tentar conectar automaticamente se houver sessão salva
+      setTimeout(() => {
+        const state = castContext.getCastState();
+        if (state === 'NOT_CONNECTED') {
+          updateStatus('🔍 Aguardando Chromecast...', 'searching');
+        }
+      }, 1000);
     }
     
-    function loadVideo() {
+    function loadAndCast() {
       const url = document.getElementById('videoUrl').value.trim();
+      const title = document.getElementById('videoTitle').value.trim() || 'Vídeo';
       const contentType = document.getElementById('contentType').value.trim() || 'video/mp4';
       
       if (!url) {
-        showStatus('⚠️ Por favor, insira uma URL de vídeo', 'error');
+        alert('⚠️ Por favor, insira uma URL de vídeo');
         return;
       }
       
-      const video = document.getElementById('videoPlayer');
-      const placeholder = document.getElementById('placeholder');
-      
-      // Carregar no player local primeiro
-      video.src = url;
-      video.style.display = 'block';
-      placeholder.style.display = 'none';
-      
-      video.onloadedmetadata = () => {
-        video.play();
-        showStatus('▶️ Vídeo carregado. Clique no ícone 📺 para enviar ao Chromecast', 'success');
-        
-        // Se já estiver conectado ao Chromecast, enviar automaticamente
-        if (castContext && castContext.getCastState() === 'CONNECTED') {
-          sendToChromecast(url, contentType);
-        }
+      // Salvar vídeo pendente
+      window.pendingVideo = {
+        url: url,
+        title: title,
+        contentType: contentType
       };
       
-      video.onerror = () => {
-        showStatus('❌ Erro ao carregar vídeo. Verifique a URL.', 'error');
-      };
+      // Mostrar informações
+      document.getElementById('videoInfo').style.display = 'block';
+      document.getElementById('infoUrl').textContent = 'URL: ' + url;
+      document.getElementById('infoTitle').textContent = 'Título: ' + title;
+      document.getElementById('infoType').textContent = 'Tipo: ' + contentType;
+      
+      updateStatus('⏳ Preparando para transmissão...', 'searching');
+      
+      // Verificar estado do Cast
+      if (!castContext) {
+        updateStatus('❌ Google Cast não inicializado', 'disconnected');
+        return;
+      }
+      
+      const castState = castContext.getCastState();
+      
+      if (castState === 'CONNECTED') {
+        // Já conectado, enviar imediatamente
+        sendToChromecast(window.pendingVideo);
+      } else if (castState === 'NOT_CONNECTED') {
+        updateStatus('⏳ Conectando ao Chromecast...', 'searching');
+        // O listener SESSION_STARTED vai enviar automaticamente
+      } else {
+        updateStatus('❌ Nenhum Chromecast disponível', 'disconnected');
+        alert('Nenhum Chromecast encontrado na rede.\n\nVerifique:\n1. Chromecast está ligado\n2. Mesma rede WiFi\n3. Botão Cast no navegador');
+      }
     }
     
-    function sendToChromecast(url, contentType) {
-      if (!castContext) {
-        showStatus('⚠️ Google Cast não inicializado', 'error');
+    function sendToChromecast(video) {
+      if (!currentSession) {
+        updateStatus('❌ Nenhuma sessão ativa', 'disconnected');
         return;
       }
       
-      if (castContext.getCastState() !== 'CONNECTED') {
-        showStatus('🔌 Não conectado a nenhum Chromecast', 'error');
-        return;
-      }
+      updateStatus('📤 Enviando para Chromecast...', 'connected');
       
-      const session = castContext.getCurrentSession();
-      if (!session) {
-        showStatus('⚠️ Nenhuma sessão ativa', 'error');
-        return;
-      }
+      // Criar MediaInfo
+      const mediaInfo = new chrome.cast.media.MediaInfo(video.url, video.contentType);
+      mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
+      mediaInfo.metadata.title = video.title;
+      mediaInfo.metadata.images = [
+        new chrome.cast.Image('https://via.placeholder.com/1280x720/1a1a2e/ffffff?text=' + encodeURIComponent(video.title))
+      ];
       
-      showStatus('📤 Enviando para Chromecast...', 'success');
-      
-      const mediaInfo = new chrome.cast.media.MediaInfo(url, contentType);
-      
+      // Criar LoadRequest
       const request = new chrome.cast.media.LoadRequest(mediaInfo);
       request.autoplay = true;
       request.currentTime = 0;
       
-      session.loadMedia(request)
-        .then(() => {
-          showStatus('✅ Transmitindo para Chromecast!', 'success');
+      // Enviar para o Chromecast
+      currentSession.loadMedia(request)
+        .then((mediaSession) => {
+          currentMediaSession = mediaSession;
+          updateStatus('✅ Transmitindo: ' + video.title, 'connected');
+          
+          // Adicionar listeners para eventos de mídia
+          mediaSession.addUpdateListener((isAlive) => {
+            if (!isAlive) {
+              currentMediaSession = null;
+              updateStatus('⏹️ Transmissão finalizada', 'connected');
+            }
+          });
+          
+          console.log('✅ Mídia enviada com sucesso');
         })
         .catch((error) => {
-          console.error('Erro ao enviar para Chromecast:', error);
-          showStatus('❌ Falha ao transmitir: ' + error.message, 'error');
+          console.error('❌ Erro ao enviar mídia:', error);
+          updateStatus('❌ Erro: ' + error.message, 'disconnected');
+          alert('Erro ao enviar para Chromecast:\n' + error.message);
         });
     }
     
-    function showStatus(message, type) {
-      const status = document.getElementById('status');
-      status.textContent = message;
-      status.className = 'status ' + type;
-      
-      // Auto-hide após 5 segundos para mensagens de sucesso
-      if (type === 'success') {
-        setTimeout(() => {
-          if (status.className.includes('success')) {
-            status.style.display = 'none';
-          }
-        }, 5000);
-      }
+    function updateStatus(message, className) {
+      const statusBar = document.getElementById('statusBar');
+      statusBar.textContent = message;
+      statusBar.className = 'status-bar ' + className;
     }
     
-    // Exemplo de vídeos prontos para teste
-    const sampleVideos = [
+    // Expor função global para App Inventor
+    window.castVideo = function(url, title, contentType) {
+      document.getElementById('videoUrl').value = url || '';
+      document.getElementById('videoTitle').value = title || 'Vídeo';
+      document.getElementById('contentType').value = contentType || 'video/mp4';
+      loadAndCast();
+    };
+    
+    // Botão Cast personalizado
+    document.getElementById('castButton').addEventListener('click', () => {
+      if (castContext) {
+        castContext.requestSession()
+          .then(() => {
+            console.log('Sessão solicitada');
+          })
+          .catch((error) => {
+            console.error('Erro ao solicitar sessão:', error);
+          });
+      }
+    });
+    
+    // Exibir botão Cast se disponível
+    setTimeout(() => {
+      document.getElementById('castButtonContainer').style.display = 'block';
+    }, 3000);
+    
+    // Vídeos de exemplo
+    window.sampleVideos = [
       {
         name: 'Big Buck Bunny',
         url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        title: 'Big Buck Bunny',
         type: 'video/mp4'
       },
       {
         name: 'Sintel',
         url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+        title: 'Sintel',
         type: 'video/mp4'
       },
       {
         name: 'Tears of Steel',
         url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+        title: 'Tears of Steel',
         type: 'video/mp4'
       }
     ];
-    
-    // Adicionar botões de exemplo (opcional)
-    window.sampleVideos = sampleVideos;
   </script>
 </body>
 </html>
